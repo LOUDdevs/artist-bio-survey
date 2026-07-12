@@ -422,8 +422,8 @@
             <input type="text" id="artist_social" name="artist_social" placeholder="@yourhandle on IG / TikTok / X">
           </div>
           <div class="field">
-            <label class="label" for="artist_city">Current city / base <span class="opt">Optional</span></label>
-            <input type="text" id="artist_city" name="artist_city" placeholder="e.g. Atlanta, GA">
+            <label class="label" for="current_city">Current city / base <span class="opt">Optional</span></label>
+            <input type="text" id="current_city" name="current_city" placeholder="e.g. Atlanta, GA">
           </div>
         </div>
       </div>
@@ -754,7 +754,7 @@
     lines.push(`Email: ${data.artist_email || ''}`);
     if (data.artist_phone) lines.push(`Phone: ${data.artist_phone}`);
     if (data.artist_social) lines.push(`Primary Social: ${data.artist_social}`);
-    if (data.artist_city) lines.push(`Current City: ${data.artist_city}`);
+    if (data.current_city) lines.push(`Current City: ${data.current_city}`);
     lines.push('');
     Q_LABELS.forEach(([key, label], idx) => {
       lines.push(`Question ${idx + 1}`);
