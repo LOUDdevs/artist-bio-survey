@@ -113,14 +113,60 @@
     border-radius: 2px;
   }
 
+  .step-chips {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .step-chip {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .step-chip.active { background: var(--accent); box-shadow: 0 0 16px var(--accent-glow); }
+  .step-chip.done { background: rgba(209, 168, 92, 0.65); }
+
+  .conversation-card {
+    background: linear-gradient(135deg, rgba(46, 229, 157, 0.10), rgba(209, 168, 92, 0.08));
+    border: 1px solid rgba(46, 229, 157, 0.18);
+    border-radius: 16px;
+    padding: 22px;
+    margin-bottom: 20px;
+  }
+  .conversation-eyebrow {
+    color: var(--accent);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .conversation-prompt {
+    color: var(--text);
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin: 0;
+  }
+
+
   /* Section */
   .section {
+    display: none;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 32px;
     margin-bottom: 20px;
     scroll-margin-top: 100px;
+    animation: sectionIn 0.22s ease-out;
+  }
+  .section.active { display: block; }
+  @keyframes sectionIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   .section-num {
     font-family: 'Space Grotesk', sans-serif;
@@ -206,6 +252,9 @@
   @media (max-width: 600px) {
     .basics-grid { grid-template-columns: 1fr; }
     .section { padding: 24px 20px; }
+    .step-chips { grid-template-columns: repeat(7, 1fr); }
+    .actions { justify-content: stretch; }
+    .actions .btn { flex: 1 1 100%; justify-content: center; }
   }
 
   /* Submit / actions */
@@ -213,11 +262,13 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 8px;
     padding-top: 24px;
     border-top: 1px solid var(--border);
   }
+  .actions-left, .actions-right { display: flex; flex-wrap: wrap; gap: 12px; }
   .btn {
     font-family: 'Inter', sans-serif;
     font-weight: 600;
@@ -310,6 +361,27 @@
   .next-steps li { margin-bottom: 6px; }
   .next-steps strong { color: var(--text); font-weight: 600; }
 
+  .review-grid {
+    display: grid;
+    gap: 12px;
+  }
+  .review-item {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .review-label {
+    display: block;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .review-value { color: var(--text); line-height: 1.5; }
+  .review-note { color: var(--text-muted); margin-top: 16px; line-height: 1.7; }
+
   /* Toast */
   .toast {
     position: fixed;
@@ -374,18 +446,23 @@
         LOUDmusic
       </div>
       <h1>Artist <span class="accent">Bio</span> Survey</h1>
-      <p class="subtitle">25 questions. Built to extract the story, sound, and signal your publicist will turn into a narrative the industry can't ignore.</p>
+      <p class="subtitle">A guided artist interview — one focused step at a time. Answer naturally, and we’ll turn the raw story into a publicist-grade bio.</p>
     </header>
 
     <div class="progress-wrap" id="progressWrap">
       <div class="progress-meta">
-        <span><strong id="progressCount">0</strong> of 25 answered</span>
+        <span>Step <strong id="stepCurrent">1</strong> of <strong id="stepTotal">7</strong> · <strong id="progressCount">0</strong> answered</span>
         <span id="progressPct">0%</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="step-chips" id="stepChips" aria-label="Survey steps"></div>
     </div>
 
     <form id="bioForm" novalidate>
+      <div class="conversation-card" aria-live="polite">
+        <div class="conversation-eyebrow" id="stepEyebrow">Quick setup</div>
+        <p class="conversation-prompt" id="stepPrompt">First, tell us who you are and where to send the finished bio. Then we’ll move through your story one piece at a time.</p>
+      </div>
 
       <!-- Quick-start: name + email so we can route back to the artist -->
       <div class="section">
@@ -588,9 +665,24 @@
         </div>
       </div>
 
-      <div class="actions">
-        <button type="button" class="btn btn-ghost" id="saveDraft">Save progress locally</button>
-        <button type="submit" class="btn btn-primary" id="submitBtn">Submit &amp; generate Q&amp;A →</button>
+      <!-- Review step -->
+      <div class="section review-section" id="reviewStep">
+        <div class="section-num">Final Step</div>
+        <h2 class="section-title">Review &amp; submit</h2>
+        <p class="section-intro">You made it. Give the essentials one last look, then submit your answers and we’ll generate the Q&amp;A block for the Architect Publicist prompt.</p>
+        <div class="review-grid" id="reviewOutput"></div>
+        <p class="review-note">After submission, you’ll see a copy-ready Question / Answer block. That is the raw material the publicist agent uses to write the finished artist bio.</p>
+      </div>
+
+      <div class="actions" id="stepActions">
+        <div class="actions-left">
+          <button type="button" class="btn btn-ghost" id="prevStep">← Back</button>
+          <button type="button" class="btn btn-ghost" id="saveDraft">Save progress locally</button>
+        </div>
+        <div class="actions-right">
+          <button type="button" class="btn btn-primary" id="nextStep">Next →</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">Submit &amp; generate Q&amp;A →</button>
+        </div>
       </div>
     </form>
 
@@ -642,15 +734,34 @@
   // -------- Elements --------
   const form = document.getElementById('bioForm');
   const submitBtn = document.getElementById('submitBtn');
+  const nextStepBtn = document.getElementById('nextStep');
+  const prevStepBtn = document.getElementById('prevStep');
   const saveDraftBtn = document.getElementById('saveDraft');
   const progressCount = document.getElementById('progressCount');
   const progressPct = document.getElementById('progressPct');
   const progressFill = document.getElementById('progressFill');
+  const stepCurrent = document.getElementById('stepCurrent');
+  const stepTotal = document.getElementById('stepTotal');
+  const stepChips = document.getElementById('stepChips');
+  const stepEyebrow = document.getElementById('stepEyebrow');
+  const stepPrompt = document.getElementById('stepPrompt');
+  const reviewOutput = document.getElementById('reviewOutput');
   const successCard = document.getElementById('successCard');
   const qaOutput = document.getElementById('qaOutput');
   const copyQaBtn = document.getElementById('copyQa');
   const downloadQaBtn = document.getElementById('downloadQa');
   const toast = document.getElementById('toast');
+  const sections = Array.from(form.querySelectorAll('.section'));
+  let currentStep = 0;
+  const STEP_COPY = [
+    ['Quick setup', 'First, tell us who you are and where to send the finished bio. Then we’ll move through your story one piece at a time.'],
+    ['Chapter 1', 'Let’s start at the beginning. Don’t worry about sounding polished — details, places, and first memories are what make this useful.'],
+    ['Chapter 2', 'Now give us the training, mentors, and lessons that shaped your ear. Formal school counts. Self-taught reps count too.'],
+    ['Chapter 3', 'This is the movement section: releases, moments, proof, setbacks, and the wins that show your trajectory.'],
+    ['Chapter 4', 'Now we get to the sound. Be specific about texture, influences, process, and the emotional world of the music.'],
+    ['Chapter 5', 'Last story section: the person behind the records, the values, fan connection, and the legacy you want to build.'],
+    ['Final check', 'Review the essentials. If everything looks right, submit and the form will generate your copy-ready Q&A block.'],
+  ];
 
   // -------- 25 question labels (in order) --------
   const Q_LABELS = [
@@ -723,7 +834,7 @@
 
   function answeredCount(data) {
     let n = 0;
-    for (const [, key] of Q_LABELS) {
+    for (const [key] of Q_LABELS) {
       if (data[key] && data[key].length > 0) n++;
     }
     if (data.artist_name) n++;
@@ -744,6 +855,75 @@
     progressCount.textContent = c;
     progressPct.textContent = pct + '%';
     progressFill.style.width = pct + '%';
+  }
+
+  function escapeHTML(value) {
+    return String(value || '').replace(/[&<>"]/g, function(ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch];
+    });
+  }
+
+  function buildReview(data) {
+    const requiredAnswered = Q_LABELS.filter(([key]) => data[key]).length;
+    const items = [
+      ['Artist', data.artist_name],
+      ['Email', data.artist_email],
+      ['Pronouns', data.pronouns],
+      ['City / base', data.current_city || 'Not provided'],
+      ['Sonic identity', data.q16_style_genre || 'Not answered yet'],
+      ['Questions answered', requiredAnswered + ' of ' + Q_LABELS.length],
+    ];
+    reviewOutput.innerHTML = items.map(([label, value]) => `
+      <div class="review-item">
+        <span class="review-label">${escapeHTML(label)}</span>
+        <div class="review-value">${escapeHTML(value)}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderStep(shouldScroll = false) {
+    sections.forEach((section, idx) => {
+      section.classList.toggle('active', idx === currentStep);
+      section.setAttribute('aria-hidden', idx === currentStep ? 'false' : 'true');
+    });
+    const last = currentStep === sections.length - 1;
+    prevStepBtn.disabled = currentStep === 0;
+    nextStepBtn.style.display = last ? 'none' : 'inline-flex';
+    submitBtn.style.display = last ? 'inline-flex' : 'none';
+    stepCurrent.textContent = currentStep + 1;
+    stepTotal.textContent = sections.length;
+    const copy = STEP_COPY[currentStep] || STEP_COPY[0];
+    stepEyebrow.textContent = copy[0];
+    stepPrompt.textContent = copy[1];
+    stepChips.innerHTML = sections.map((_, idx) => `<span class="step-chip ${idx === currentStep ? 'active' : idx < currentStep ? 'done' : ''}"></span>`).join('');
+    if (last) buildReview(getFormData());
+    updateProgress();
+    if (shouldScroll) {
+      document.querySelector('.progress-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function validateStep(stepIdx) {
+    const data = getFormData();
+    if (stepIdx === 0) {
+      if (!data.artist_name) { showToast('First, enter your stage / artist name.'); document.getElementById('artist_name').focus(); return false; }
+      if (!data.artist_email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.artist_email)) {
+        showToast('Enter a valid email so we can send the bio back.');
+        document.getElementById('artist_email').focus();
+        return false;
+      }
+      if (!data.pronouns) { showToast('Select your pronouns before moving on.'); document.getElementById('artist_pronouns').focus(); return false; }
+      return true;
+    }
+    const currentSection = sections[stepIdx];
+    const missing = currentSection && Array.from(currentSection.querySelectorAll('[required]')).find((el) => !String(el.value || '').trim());
+    if (missing) {
+      const q = missing.id && missing.id.startsWith('q') ? missing.id.replace('q', '') : '';
+      showToast(q ? 'Please answer question ' + q + ' before moving on.' : 'Please complete this step before moving on.');
+      missing.focus();
+      return false;
+    }
+    return true;
   }
 
   function buildQA(data) {
@@ -787,6 +967,7 @@
         const el = form.elements[k];
         if (el && typeof v === 'string') el.value = v;
       }
+      if (pronounsSelect) pronounsSelect.dispatchEvent(new Event('change'));
       updateProgress();
     } catch (e) { /* ignore */ }
   }
@@ -833,12 +1014,38 @@
   }
 
   // -------- Events --------
-  form.addEventListener('input', updateProgress);
-  form.addEventListener('change', updateProgress);
+  form.addEventListener('input', function() {
+    updateProgress();
+    if (currentStep === sections.length - 1) buildReview(getFormData());
+  });
+  form.addEventListener('change', function() {
+    updateProgress();
+    if (currentStep === sections.length - 1) buildReview(getFormData());
+  });
   saveDraftBtn.addEventListener('click', saveDraftLocal);
+  prevStepBtn.addEventListener('click', function() {
+    if (currentStep > 0) {
+      currentStep -= 1;
+      renderStep(true);
+    }
+  });
+  nextStepBtn.addEventListener('click', function() {
+    if (!validateStep(currentStep)) return;
+    if (currentStep < sections.length - 1) {
+      currentStep += 1;
+      renderStep(true);
+    }
+  });
 
   form.addEventListener('submit', async function(ev) {
     ev.preventDefault();
+    if (currentStep < sections.length - 1) {
+      if (validateStep(currentStep)) {
+        currentStep += 1;
+        renderStep(true);
+      }
+      return;
+    }
     const data = getFormData();
 
     // Basic validation
@@ -922,7 +1129,7 @@
 
   // Initial load
   loadDraftLocal();
-  updateProgress();
+  renderStep(false);
 })();
 </script>
 </body>
