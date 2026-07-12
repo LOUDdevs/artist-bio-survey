@@ -329,6 +329,7 @@
     margin-bottom: 8px;
   }
   .success p { color: var(--text-muted); margin-bottom: 20px; }
+  .bio-output,
   .qa-output {
     background: #050507;
     border: 1px solid var(--border);
@@ -340,7 +341,7 @@
     color: var(--text);
     white-space: pre-wrap;
     word-wrap: break-word;
-    max-height: 320px;
+    max-height: 520px;
     overflow-y: auto;
     margin-bottom: 16px;
   }
@@ -360,6 +361,8 @@
   .next-steps ol { padding-left: 20px; color: var(--text-muted); font-size: 0.875rem; }
   .next-steps li { margin-bottom: 6px; }
   .next-steps strong { color: var(--text); font-weight: 600; }
+  .qa-details summary { cursor: pointer; color: var(--gold); font-weight: 700; margin-bottom: 12px; }
+  .bio-output { border-left: 3px solid var(--accent); }
 
   .review-grid {
     display: grid;
@@ -669,9 +672,9 @@
       <div class="section review-section" id="reviewStep">
         <div class="section-num">Final Step</div>
         <h2 class="section-title">Review &amp; submit</h2>
-        <p class="section-intro">You made it. Give the essentials one last look, then submit your answers and we’ll generate the Q&amp;A block for the Architect Publicist prompt.</p>
+        <p class="section-intro">You made it. Give the essentials one last look, then submit your answers and we’ll generate the finished bio with the Architect Publicist.</p>
         <div class="review-grid" id="reviewOutput"></div>
-        <p class="review-note">After submission, you’ll see a copy-ready Question / Answer block. That is the raw material the publicist agent uses to write the finished artist bio.</p>
+        <p class="review-note">After submission, the publicist agent will write the full bio kit automatically. The raw Q&amp;A will still be available underneath for reference.</p>
       </div>
 
       <div class="actions" id="stepActions">
@@ -681,33 +684,32 @@
         </div>
         <div class="actions-right">
           <button type="button" class="btn btn-primary" id="nextStep">Next →</button>
-          <button type="submit" class="btn btn-primary" id="submitBtn">Submit &amp; generate Q&amp;A →</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">Generate my bio →</button>
         </div>
       </div>
     </form>
 
-    <!-- Success card with Q&A output -->
+    <!-- Success card with generated bio + Q&A output -->
     <div class="success" id="successCard">
       <div class="success-icon">✓</div>
-      <h2>You're in. Survey received.</h2>
-      <p>Your responses were submitted to LOUDmusic. Copy the Q&amp;A below and paste it into the Architect Publicist prompt to generate your top-tier bio.</p>
+      <h2>Your artist bio is ready.</h2>
+      <p>Your responses were submitted to LOUDmusic and the Architect Publicist generated a finished bio kit below.</p>
 
-      <div class="qa-output" id="qaOutput"></div>
+      <div class="bio-output" id="bioOutput"></div>
 
       <div class="actions" style="border-top: none; padding-top: 0; margin-top: 0;">
-        <button type="button" class="btn btn-ghost" id="copyQa">Copy Q&amp;A</button>
-        <button type="button" class="btn btn-primary" id="downloadQa">Download .txt</button>
+        <button type="button" class="btn btn-primary" id="copyBio">Copy Bio</button>
+        <button type="button" class="btn btn-ghost" id="downloadBio">Download Bio .txt</button>
       </div>
 
-      <div class="next-steps">
-        <h3>Next: Generate your bio</h3>
-        <ol>
-          <li>Click <strong>Copy Q&amp;A</strong> above.</li>
-          <li>Open the <strong>Architect Publicist</strong> prompt template.</li>
-          <li>Paste the Q&amp;A into the <code>{insert Full Q&amp;A here}</code> slot.</li>
-          <li>Run the prompt. You'll get a publicist-grade bio in seconds.</li>
-        </ol>
-      </div>
+      <details class="next-steps qa-details">
+        <summary>Raw survey Q&amp;A</summary>
+        <div class="qa-output" id="qaOutput"></div>
+        <div class="actions" style="border-top: none; padding-top: 0; margin-top: 12px;">
+          <button type="button" class="btn btn-ghost" id="copyQa">Copy Q&amp;A</button>
+          <button type="button" class="btn btn-ghost" id="downloadQa">Download Q&amp;A .txt</button>
+        </div>
+      </details>
     </div>
 
     <footer class="footer">
@@ -747,7 +749,10 @@
   const stepPrompt = document.getElementById('stepPrompt');
   const reviewOutput = document.getElementById('reviewOutput');
   const successCard = document.getElementById('successCard');
+  const bioOutput = document.getElementById('bioOutput');
   const qaOutput = document.getElementById('qaOutput');
+  const copyBioBtn = document.getElementById('copyBio');
+  const downloadBioBtn = document.getElementById('downloadBio');
   const copyQaBtn = document.getElementById('copyQa');
   const downloadQaBtn = document.getElementById('downloadQa');
   const toast = document.getElementById('toast');
@@ -760,7 +765,7 @@
     ['Chapter 3', 'This is the movement section: releases, moments, proof, setbacks, and the wins that show your trajectory.'],
     ['Chapter 4', 'Now we get to the sound. Be specific about texture, influences, process, and the emotional world of the music.'],
     ['Chapter 5', 'Last story section: the person behind the records, the values, fan connection, and the legacy you want to build.'],
-    ['Final check', 'Review the essentials. If everything looks right, submit and the form will generate your copy-ready Q&A block.'],
+    ['Final check', 'Review the essentials. If everything looks right, submit and the form will generate your finished bio kit.'],
   ];
 
   // -------- 25 question labels (in order) --------
@@ -978,7 +983,7 @@
   // -------- Submission --------
   async function submitForm(data) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner"></span> Submitting...';
+    submitBtn.innerHTML = '<span class="spinner"></span> Generating bio...';
     try {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
@@ -999,13 +1004,15 @@
       return { ok: true, response: json };
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit & generate Q&A →';
+      submitBtn.textContent = 'Generate my bio →';
     }
   }
 
-  function showSuccess(data) {
-    const qa = buildQA(data);
+  function showSuccess(data, response) {
+    const qa = (response && response.qa) || buildQA(data);
+    const bio = response && response.bio;
     qaOutput.textContent = qa;
+    bioOutput.textContent = bio || 'Your survey was received, but the automated bio generator could not complete this run. Your raw Q&A is saved below for LOUDmusic to regenerate the bio.';
     successCard.classList.add('show');
     // Scroll the success card into view
     setTimeout(() => {
@@ -1078,23 +1085,58 @@
 
     try {
       const result = await submitForm(data);
-      showSuccess(data);
+      showSuccess(data, result.response);
       clearDraftLocal();
-      showToast('Survey received. Your Q&A is ready below.');
+      showToast(result.response && result.response.bio ? 'Bio generated. Your bio kit is ready below.' : 'Survey received. Bio generation needs a retry.');
     } catch (err) {
       console.error('Submit failed', err);
-      // Even on backend failure, show the Q&A so the artist isn't blocked —
-      // they can copy and email it to the publicist manually.
-      showSuccess(data);
-      showToast('Saved locally — could not reach the server. Copy your Q&A and email it to your publicist.');
+      // Even on backend failure, show the Q&A so the artist isn't blocked.
+      showSuccess(data, null);
+      showToast('Saved locally — could not reach the server. Your Q&A is below for recovery.');
     }
+  });
+
+  copyBioBtn.addEventListener('click', async function() {
+    const text = bioOutput.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Bio copied to clipboard.');
+    } catch (e) {
+      const range = document.createRange();
+      range.selectNodeContents(bioOutput);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try {
+        document.execCommand('copy');
+        showToast('Bio copied.');
+      } catch (e2) {
+        showToast('Copy failed. Select the bio manually and press ⌘/Ctrl+C.');
+      }
+      sel.removeAllRanges();
+    }
+  });
+
+  downloadBioBtn.addEventListener('click', function() {
+    const text = bioOutput.textContent;
+    const name = (form.elements.artist_name.value || 'artist').replace(/[^a-z0-9_-]+/gi, '_');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name + '_artist_bio.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Bio downloaded.');
   });
 
   copyQaBtn.addEventListener('click', async function() {
     const text = qaOutput.textContent;
     try {
       await navigator.clipboard.writeText(text);
-      showToast('Q&A copied to clipboard. Paste into the Architect Publicist prompt.');
+      showToast('Q&A copied to clipboard.');
     } catch (e) {
       // Fallback: select the text in the pre block
       const range = document.createRange();
